@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// PiggyLedger security rules
+// ---------------------------------------------------------------
+// This app has no login system by design (see README/SETUP docs).
+// Instead, every family's data lives under a long, randomly
+// generated "family ID" path segment that only appears inside your
+// own app's config (assets/js/firebaseConfig.js) and in the URLs
+// you bookmark on your own devices. Nobody can guess a 20+
+// character random ID, so in practice this behaves like an
+// unlisted/unguessable link — similar to a private Google Doc link.
+//
+// These rules simply require that the familyId segment be at least
+// 20 characters long. You do NOT need to edit this file — paste it
+// into the Firebase console exactly as-is. The randomness lives in
+// the ID you generate during setup, not in this file.
+//
+// Want real password-style protection later? See docs/SETUP.md ->
+// "Upgrading security later" for how to layer Firebase Auth on top
+// without changing your data model.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{familyId} {
+      allow read, write: if familyId.size() >= 20;
+    }
+    match /families/{familyId}/{document=**} {
+      allow read, write: if familyId.size() >= 20;
+    }
+  }
+}

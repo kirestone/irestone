@@ -1,0 +1,17 @@
+{
+  "name": "piggyledger-devtools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local dev/test tooling only. The deployed site itself is plain static HTML/CSS/JS with no build step or npm dependency — see docs/SETUP.md.",
+  "type": "module",
+  "scripts": {
+    "test:logic": "node --test tests/financeEngine.test.mjs",
+    "test:store": "node --test tests/familyStore.test.mjs",
+    "test": "npm run test:logic && npm run test:store",
+    "emulator": "firebase emulators:start --only firestore --project demo-piggyledger"
+  },
+  "devDependencies": {
+    "firebase": "^12.18.0",
+    "firebase-tools": "^15.28.2"
+  }
+}

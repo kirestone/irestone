@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Parent Dashboard — PiggyLedger</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect x=%225%22 y=%2212.5%22 width=%2222%22 height=%2215%22 rx=%227%22 fill=%22%234B4FD1%22/><circle cx=%2216%22 cy=%226.5%22 r=%224.5%22 fill=%22%23EF8360%22/></svg>" />
+  <link rel="preconnect" href="https://api.fontshare.com" />
+  <link href="https://api.fontshare.com/v2/css?f[]=chillax@500,600,700&f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <style>
+    .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+    .section-title h2 { font-size: var(--text-lg); }
+    .kid-mgmt-card { display: flex; flex-direction: column; gap: var(--space-5); }
+    .kid-mgmt-head { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+    .kid-mgmt-avatar { width: 56px; height: 56px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0; }
+    .kid-mgmt-name { font-family: var(--font-display); font-weight: 600; font-size: var(--text-base); }
+    .kid-mgmt-balance { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); color: var(--color-primary); }
+    .kid-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
+    .kid-body { display: none; flex-direction: column; gap: var(--space-5); border-top: 1px solid var(--color-divider); padding-top: var(--space-5); }
+    .kid-body.open { display: flex; }
+    .subgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-5); }
+    .inline-form { background: var(--color-surface-offset); border-radius: var(--radius-md); padding: var(--space-4); display: none; }
+    .inline-form.open { display: block; }
+    .tx-table-wrap { overflow-x: auto; }
+    .tx-table th, .tx-table td { text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); border-bottom: 1px solid var(--color-divider); }
+    .tx-table th { color: var(--color-text-muted); font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.03em; }
+    .kid-link-row { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); flex-wrap: wrap; }
+    .kid-link-row code { background: var(--color-surface-offset); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); word-break: break-all; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+    .switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; inset: 0; background: var(--color-border); border-radius: var(--radius-full); transition: background var(--transition-interactive); }
+    .switch .thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: transform var(--transition-interactive); box-shadow: var(--shadow-sm); }
+    .switch input:checked + .track { background: var(--color-primary); }
+    .switch input:checked + .track .thumb { transform: translateX(18px); }
+    #pin-gate { position: fixed; inset: 0; background: var(--color-bg); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    #pin-gate .card { max-width: 320px; width: 90%; text-align: center; }
+    .avatar-picker, .color-picker { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+    .avatar-picker button, .color-picker button { width: 40px; height: 40px; border-radius: var(--radius-full); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; background: var(--color-surface-offset); }
+    .avatar-picker button[aria-pressed='true'], .color-picker button[aria-pressed='true'] { border-color: var(--color-primary); }
+  </style>
+</head>
+<body>
+  <div id="pin-gate" hidden style="display: none;">
+    <div class="card stack">
+      <h2>🔒 Enter Parent PIN</h2>
+      <p class="muted">This dashboard is PIN-protected on this device.</p>
+      <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="••••" style="text-align:center; font-size: 1.5rem; letter-spacing: 0.3em; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--color-border);" />
+      <button class="btn btn-primary btn-block" id="pin-submit">Unlock</button>
+      <p id="pin-error" class="muted" style="color: var(--color-spend); display:none;">Incorrect PIN, try again.</p>
+    </div>
+  </div>
+
+  <div id="app-root">
+    <header class="topbar">
+      <a class="brand" href="index.html"><span class="brand-logo"></span>PiggyLedger</a>
+      <div class="row">
+        <button class="icon-btn" data-theme-toggle aria-label="Toggle dark mode"></button>
+        <a class="btn btn-ghost btn-sm" href="index.html">View Family Home</a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div id="demo-banner-slot"></div>
+
+      <section class="card" style="margin-bottom: var(--space-8);">
+        <div class="section-title"><h2>Family settings</h2></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="family-name-input">Family name</label>
+            <input id="family-name-input" type="text" placeholder="The Smith Family" />
+          </div>
+        </div>
+        <div class="toggle-row" style="margin-top: var(--space-2);">
+          <div>
+            <strong>Require a PIN to open this dashboard</strong>
+            <p class="field-hint">Keeps curious kids from tapping into parent controls on a shared device. See docs/SETUP.md for the security model.</p>
+          </div>
+          <label class="switch"><input type="checkbox" id="pin-enabled-toggle" /><span class="track"><span class="thumb"></span></span></label>
+        </div>
+        <div id="pin-set-form" class="inline-form" style="margin-top: var(--space-4);">
+          <div class="field-row">
+            <div class="field">
+              <label for="new-pin-input">Set a 4-8 digit PIN</label>
+              <input id="new-pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="1234" />
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="save-pin-btn">Save PIN</button>
+        </div>
+        <div class="row" style="margin-top: var(--space-5); justify-content: flex-end;">
+          <button class="btn btn-primary" id="save-family-btn">Save family settings</button>
+        </div>
+      </section>
+
+      <div class="section-title">
+        <h2>Kids</h2>
+        <button class="btn btn-primary" id="add-kid-btn">+ Add a kid</button>
+      </div>
+      <div id="add-kid-form" class="inline-form card" style="margin-bottom: var(--space-6);">
+        <div class="field">
+          <label for="new-kid-name">Name</label>
+          <input id="new-kid-name" type="text" placeholder="Riley" />
+        </div>
+        <div class="field">
+          <label>Avatar</label>
+          <div class="avatar-picker" id="new-kid-avatar-picker"></div>
+        </div>
+        <div class="field">
+          <label>Color</label>
+          <div class="color-picker" id="new-kid-color-picker"></div>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" id="create-kid-btn">Add kid</button>
+          <button class="btn btn-ghost" id="cancel-kid-btn">Cancel</button>
+        </div>
+      </div>
+
+      <div id="kids-list" class="stack"></div>
+    </main>
+
+    <footer style="text-align:center; padding: var(--space-10) var(--space-5); color: var(--color-text-faint); font-size: var(--text-xs);">
+      PiggyLedger is a modeling &amp; tracking tool only — no real money moves through this site.
+    </footer>
+  </div>
+
+  <script type="module" src="assets/js/parent.js"></script>
+<script data-pplx-inline-edit>
+(function () {
+  if (window === window.top) return;
+
+  const allowedParentOrigins = ["https://www.perplexity.ai","https://perplexity.ai","https://testing.perplexity.ai","https://staging.perplexity.ai","https://*.preview.i.perplexity.ai","http://perplexity.localhost","http://localhost:1420","http://127.0.0.1:1420","http://localhost:3000","http://127.0.0.1:3000","http://localhost:5173","http://127.0.0.1:5173"];
+  const MAX_FONT_BYTES = 500 * 1024;
+  const MAX_TOTAL_FONT_BYTES = 2 * 1024 * 1024;
+  let scrollForwarding = false;
+  let scrollRaf = 0;
+  let trustedTopOrigin = null;
+
+  // Allow entries like "https://*.preview.i.perplexity.ai" — the wildcard
+  // matches a single DNS label (no dots), so "https://*.foo" cannot stretch
+  // across multiple labels.
+  function matchesAllowedOrigin(origin) {
+    if (!origin) return false;
+    for (const entry of allowedParentOrigins) {
+      if (!entry.includes("*")) {
+        if (entry === origin) return true;
+        continue;
+      }
+      const pattern = new RegExp(
+        "^" +
+          entry.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^.]+") +
+          "$",
+      );
+      if (pattern.test(origin)) return true;
+    }
+    return false;
+  }
+
+  // Trust decision: when the sender is same-origin-visible (event.origin is a
+  // real origin like https://www.perplexity.ai) we trust event.origin directly.
+  // When event.origin is "null" (opaque broker srcdoc), we fall back to the
+  // broker's stamped `parentOrigin` to identify the top window. The fallback
+  // is claim-only — we rely on the browser's native `targetOrigin` enforcement
+  // on the response path (see postToTrustedTop) to ensure replies can't be
+  // delivered to anyone but the actual top window of that claimed origin.
+  function getTrustedParentOrigin(event) {
+    const forwardedParentOrigin =
+      typeof event.data.parentOrigin === "string" ? event.data.parentOrigin : null;
+    const parentOrigin = event.origin === "null" ? forwardedParentOrigin : event.origin;
+    return matchesAllowedOrigin(parentOrigin) ? parentOrigin : null;
+  }
+
+  // All responses go to window.top with targetOrigin = the allowlisted origin.
+  // An attacker that iframes us inside their own null-origin broker can claim
+  // any parentOrigin they like, but the browser will drop the reply whenever
+  // the real top's origin doesn't match — so the screenshot never leaves.
+  function postToTrustedTop(message) {
+    if (!trustedTopOrigin) return;
+    try {
+      window.top.postMessage(message, trustedTopOrigin);
+    } catch (_error) {}
+  }
+
+  function inlineAll(original, clone) {
+    if (original.nodeType !== 1 || clone.nodeType !== 1) return;
+
+    try {
+      const computedStyle = getComputedStyle(original);
+      // cssText on a computed style is the serialized declaration in modern
+      // Chromium/Safari — a single read beats enumerating ~400 longhand
+      // properties. Firefox returns "" here, so we fall back on empty.
+      const serialized = computedStyle.cssText;
+      if (serialized) {
+        clone.style.cssText = serialized;
+      } else {
+        const parts = new Array(computedStyle.length);
+        for (let index = 0; index < computedStyle.length; index += 1) {
+          const property = computedStyle[index];
+          parts[index] = `${property}:${computedStyle.getPropertyValue(property)};`;
+        }
+        clone.style.cssText = parts.join("");
+      }
+    } catch (_error) {}
+
+    const originalChildren = original.children;
+    const clonedChildren = clone.children;
+    for (
+      let index = 0;
+      index < originalChildren.length && index < clonedChildren.length;
+      index += 1
+    ) {
+      inlineAll(originalChildren[index], clonedChildren[index]);
+    }
+  }
+
+  function extractFontUrl(srcValue) {
+    const matches = [
+      ...srcValue.matchAll(
+        /url\(["']?([^"')]+)["']?\)(?:\s*format\(["']?([^"')]+)["']?\))?/gi,
+      ),
+    ];
+    if (matches.length === 0) return null;
+    const woff2 = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff2"));
+    if (woff2) return woff2[1];
+    const woff = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff"));
+    if (woff) return woff[1];
+    return matches[0][1];
+  }
+
+  // Cache resolved font URL -> data URI across captures. Fonts on a page
+  // essentially never change, and a batch run emits multiple captures back to
+  // back — without this we'd refetch + re-base64 every time.
+  const fontDataUriCache = new Map();
+  const SRC_DECLARATION_RE = /src\s*:\s*[^;}]+/i;
+
+  async function fetchAsDataUri(url) {
+    if (fontDataUriCache.has(url)) return fontDataUriCache.get(url);
+    let dataUri = null;
+    try {
+      const response = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size <= MAX_FONT_BYTES) {
+          dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () =>
+              resolve(typeof reader.result === "string" ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    } catch (_error) {
+      dataUri = null;
+    }
+    fontDataUriCache.set(url, dataUri);
+    return dataUri;
+  }
+
+  function collectFontFaceRuleTexts() {
+    const rules = [];
+    for (const sheet of document.styleSheets) {
+      let cssRules;
+      try {
+        cssRules = sheet.cssRules;
+      } catch (_error) {
+        continue;
+      }
+      if (!cssRules) continue;
+      for (const rule of cssRules) {
+        const cssText = rule.cssText || "";
+        if (cssText.startsWith("@font-face")) rules.push(cssText);
+      }
+    }
+    return rules;
+  }
+
+  async function buildInlinedFontCss() {
+    const ruleTexts = collectFontFaceRuleTexts();
+    if (ruleTexts.length === 0) return null;
+
+    const resolved = ruleTexts.map((cssText) => {
+      if (!SRC_DECLARATION_RE.test(cssText)) return null;
+      const srcMatch = cssText.match(/src\s*:\s*([^;}]+)[;}]/i);
+      if (!srcMatch) return null;
+      const url = extractFontUrl(srcMatch[1]);
+      if (!url) return null;
+      try {
+        return { cssText, url: new URL(url, document.baseURI).href };
+      } catch (_error) {
+        return null;
+      }
+    });
+
+    const dataUris = await Promise.all(
+      resolved.map((entry) => (entry ? fetchAsDataUri(entry.url) : Promise.resolve(null))),
+    );
+
+    const inlined = [];
+    let totalBytes = 0;
+    for (let index = 0; index < resolved.length; index += 1) {
+      const entry = resolved[index];
+      const dataUri = dataUris[index];
+      if (!entry || !dataUri) continue;
+      const approxBytes = dataUri.length * 0.75;
+      if (totalBytes + approxBytes > MAX_TOTAL_FONT_BYTES) break;
+      totalBytes += approxBytes;
+      inlined.push(entry.cssText.replace(SRC_DECLARATION_RE, `src: url("${dataUri}")`));
+    }
+    return inlined.length > 0 ? inlined.join("\n") : null;
+  }
+
+  function stripExternal(clone) {
+    const images = clone.querySelectorAll("img");
+    for (let index = 0; index < images.length; index += 1) {
+      const src = images[index].getAttribute("src");
+      if (src && !src.startsWith("data:")) images[index].removeAttribute("src");
+    }
+
+    const elements = clone.querySelectorAll("*");
+    for (let index = 0; index < elements.length; index += 1) {
+      const style = elements[index].style.cssText;
+      if (style && style.includes("url(")) {
+        elements[index].style.cssText = style.replace(
+          /url\(["']?(?!data:)[^)"']*["']?\)/gi,
+          "none",
+        );
+      }
+    }
+  }
+
+  function emitScroll() {
+    scrollRaf = 0;
+    if (!scrollForwarding) return;
+    postToTrustedTop({
+      type: "INLINE_EDIT_SCROLL",
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+    });
+  }
+
+  window.addEventListener(
+    "scroll",
+    function () {
+      if (!scrollForwarding || scrollRaf) return;
+      scrollRaf = requestAnimationFrame(emitScroll);
+    },
+    { passive: true, capture: true },
+  );
+
+  async function handleCaptureRequest(event) {
+    const requestId = event.data.requestId;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    function postResult(dataUrl) {
+      postToTrustedTop({
+        type: "INLINE_EDIT_SCREENSHOT_RESULT",
+        requestId,
+        dataUrl,
+        scrollX,
+        scrollY,
+      });
+    }
+
+    try {
+      // Wait for any pending web fonts to resolve so both inline metrics and
+      // the @font-face inlining below see the same loaded faces.
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (_error) {}
+      }
+
+      const clone = document.documentElement.cloneNode(true);
+      inlineAll(document.documentElement, clone);
+
+      const removedNodes = clone.querySelectorAll("script,link[rel=\"stylesheet\"],style");
+      for (let index = 0; index < removedNodes.length; index += 1) {
+        removedNodes[index].remove();
+      }
+
+      stripExternal(clone);
+
+      // Re-embed web fonts as data-URI @font-face rules so the SVG rasterizer
+      // can resolve them — external font URLs aren't fetched during
+      // foreignObject rendering, which would otherwise force a fallback face
+      // and change text metrics.
+      const inlinedFontCss = await buildInlinedFontCss();
+      if (inlinedFontCss) {
+        const styleEl = document.createElement("style");
+        styleEl.textContent = inlinedFontCss;
+        const head = clone.querySelector("head");
+        if (head) head.appendChild(styleEl);
+        else clone.insertBefore(styleEl, clone.firstChild);
+      }
+
+      const html = new XMLSerializer().serializeToString(clone);
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        '<foreignObject width="100%" height="100%">' +
+        `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden">` +
+        `<div style="position:relative;left:-${scrollX}px;top:-${scrollY}px">` +
+        html +
+        "</div></div></foreignObject></svg>";
+      const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      const image = new Image();
+      image.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        postResult(canvas.toDataURL("image/png"));
+      };
+      image.onerror = function () {
+        postResult(null);
+      };
+      image.src = svgUrl;
+    } catch (_error) {
+      postResult(null);
+    }
+  }
+
+  window.addEventListener("message", function (event) {
+    if (!event.data) return;
+    // Only accept messages from the direct parent frame. Blocks sibling /
+    // unrelated-window postMessage senders that could otherwise reach us.
+    if (event.source !== window.parent) return;
+
+    const trustedParentOrigin = getTrustedParentOrigin(event);
+    if (!trustedParentOrigin) return;
+    trustedTopOrigin = trustedParentOrigin;
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_START") {
+      scrollForwarding = true;
+      emitScroll();
+      return;
+    }
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_STOP") {
+      scrollForwarding = false;
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      scrollRaf = 0;
+      return;
+    }
+
+    if (event.data.type !== "INLINE_EDIT_CAPTURE_REQUEST") return;
+
+    handleCaptureRequest(event);
+  });
+})();
+
+
+</script></body>
+</html>
